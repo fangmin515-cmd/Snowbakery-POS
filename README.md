@@ -1,4 +1,4 @@
-# Snowtee POS 云端版
+# Snowbakery POS 云端版
 
 这是一个基于 Node.js + Express + SQLite 的云端收银系统。
 支持多设备访问，包含前端和后端，部署到 Render/Railway 即可使用。
