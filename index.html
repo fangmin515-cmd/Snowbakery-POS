@@ -1,12 +1,111 @@
 
 <!DOCTYPE html>
-<html>
+<html lang="zh">
 <head>
-<meta charset="utf-8">
-<title>Snowtee POS</title>
+<meta charset="UTF-8">
+<title>Snowtee POS 系统</title>
+<style>
+body { font-family: Arial; margin: 20px; }
+table { border-collapse: collapse; width: 100%; margin-top: 10px; }
+th, td { border: 1px solid #ccc; padding: 6px; text-align: center; }
+input, select { padding: 4px; }
+button { padding: 6px 10px; margin: 2px; }
+</style>
 </head>
 <body>
-<h1>Snowtee POS 多商品下单系统</h1>
-<!-- 前端可用JS调用API录入订单和查看统计 -->
+<h1>Snowtee POS 系统</h1>
+
+<h3>产品上架</h3>
+产品名: <input id="new-product-name">
+价格: <input id="new-product-price" type="number" step="0.01">
+<button onclick="addProduct()">上架</button>
+
+<h3>新订单录入</h3>
+<table id="order-table">
+<thead>
+<tr><th>产品</th><th>单价</th><th>数量</th><th>优惠金额</th><th>操作</th></tr>
+</thead>
+<tbody></tbody>
+</table>
+<button onclick="addOrderRow()">+ 添加产品</button>
+<br><br>
+<button onclick="saveOrder()">保存订单</button>
+
+<h3>当日统计</h3>
+<div id="summary"></div>
+
+<h3>各产品销量及金额</h3>
+<div id="product-summary"></div>
+
+<h3>当日订单明细</h3>
+<div id="orders"></div>
+
+<script>
+let products = [];
+
+function loadProducts() {
+    fetch('/api/products').then(r=>r.json()).then(data=>{products=data;});
+}
+
+function addProduct() {
+    const name = document.getElementById('new-product-name').value.trim();
+    const price = parseFloat(document.getElementById('new-product-price').value);
+    if(!name||isNaN(price)){alert('请填写产品名和价格'); return;}
+    fetch('/api/products',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name,price})})
+    .then(r=>r.json()).then(d=>{alert('产品已上架'); document.getElementById('new-product-name').value=''; document.getElementById('new-product-price').value=''; loadProducts();});
+}
+
+function addOrderRow(){
+    const tbody=document.querySelector('#order-table tbody');
+    const row=document.createElement('tr');
+    let options=products.map(p=>`<option value="\${p.id}" data-price="\${p.price}">\${p.name}</option>`).join('');
+    row.innerHTML=`
+    <td><select onchange="updatePrice(this)"><option value="">请选择</option>${options}</select></td>
+    <td><input type="number" step="0.01" readonly></td>
+    <td><input type="number" value="1"></td>
+    <td><input type="number" step="0.01" value="0"></td>
+    <td><button onclick="this.parentElement.parentElement.remove()">删除</button></td>`;
+    tbody.appendChild(row);
+}
+
+function updatePrice(select){
+    const priceInput=select.parentElement.nextElementSibling.firstElementChild;
+    const option=select.selectedOptions[0];
+    priceInput.value=option&&option.dataset.price?option.dataset.price:'';
+}
+
+function saveOrder(){
+    const rows=document.querySelectorAll('#order-table tbody tr');
+    if(rows.length===0){alert('请添加产品'); return;}
+    const items=[];
+    rows.forEach(r=>{
+        const sel=r.querySelector('select');
+        const prodId=parseInt(sel.value);
+        if(!prodId) return;
+        const prodName=sel.selectedOptions[0].text;
+        const price=parseFloat(r.querySelector('td:nth-child(2) input').value);
+        const qty=parseInt(r.querySelector('td:nth-child(3) input').value);
+        const discount=parseFloat(r.querySelector('td:nth-child(4) input').value);
+        items.push({product_id:prodId,product_name:prodName,price,quantity:qty,discount});
+    });
+    fetch('/api/orders',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({items})})
+    .then(r=>r.json()).then(d=>{alert('订单已保存'); document.querySelector('#order-table tbody').innerHTML=''; loadToday();});
+}
+
+function loadToday(){
+    fetch('/api/orders/today').then(r=>r.json()).then(data=>{
+        document.getElementById('summary').innerHTML=`订单数：${data.orderCount} | 总件数：${data.totalQty} | 营业额：${data.totalAmount.toFixed(2)}`;
+        let ps='<table><tr><th>产品</th><th>销量</th><th>销售额</th></tr>';
+        data.products.forEach(p=>{ps+=`<tr><td>${p.product_name}</td><td>${p.total_qty}</td><td>${p.total_amount.toFixed(2)}</td></tr>`;});
+        ps+='</table>'; document.getElementById('product-summary').innerHTML=ps;
+        let html='<table><tr><th>订单ID</th><th>时间</th><th>产品</th><th>数量</th><th>单价</th><th>优惠</th><th>小计</th></tr>';
+        data.orders.forEach(o=>{o.items.forEach(i=>{html+=`<tr><td>${o.id}</td><td>${o.created_at}</td><td>${i.product_name}</td><td>${i.quantity}</td><td>${i.price}</td><td>${i.discount}</td><td>${i.subtotal.toFixed(2)}</td></tr>`;});});
+        html+='</table>'; document.getElementById('orders').innerHTML=html;
+    });
+}
+
+loadProducts();
+loadToday();
+</script>
 </body>
 </html>
