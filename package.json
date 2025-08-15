@@ -3,9 +3,7 @@
   "name": "snowtee-pos",
   "version": "1.0.0",
   "main": "server.js",
-  "engines": {
-    "node": "22.x"
-  },
+  "engines": {"node": "22.x"},
   "dependencies": {
     "express": "^4.18.2",
     "sqlite3": "^5.1.6",
